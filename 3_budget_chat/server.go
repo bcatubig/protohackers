@@ -112,7 +112,7 @@ func (s *Server) handle(c *conn) {
 			}
 		}
 
-		io.Copy(c.rwc, strings.NewReader(fmt.Sprintf("\nWelcome, %s!\n", c.username)))
+		io.Copy(c.rwc, strings.NewReader(fmt.Sprintf("* The room contains: %s\n", "<TODO - users>")))
 	}
 
 	// handle the thing
@@ -121,6 +121,8 @@ func (s *Server) handle(c *conn) {
 			return
 		}
 
+		// TODO: check if new user joined
+
 		buf := bufio.NewReaderSize(c.rwc, 2048)
 
 		line, err := buf.ReadString('\n')
@@ -128,6 +130,7 @@ func (s *Server) handle(c *conn) {
 
 		if err != nil {
 			if errors.Is(err, io.EOF) {
+				// TODO: send disconnect signal
 				return
 			}
 			logger.Error(err.Error())
