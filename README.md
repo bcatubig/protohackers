@@ -4,17 +4,17 @@ Solutions to https://protohackers.com
 
 Done:
 
-[x] - Smoke Test
-[x] - Prime Time
-[x] - Means to an End
-[ ] - Budget Chat
+-   [x] Smoke Test
+-   [x] Prime Time
+-   [x] Means to an End
+-   [ ] Budget Chat
 
 ## Deploying
 
 > TODO
 
 ```shell
-
+make deploy
 ```
 
 ## Testing
