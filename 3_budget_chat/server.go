@@ -54,9 +54,21 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 	logger.Info("shutting down server")
 
-	for c := range s.activeConn {
-		c.close()
-		s.removeConn(c)
+	chanDone := make(chan struct{})
+
+	go func() {
+		for c := range s.activeConn {
+			c.close()
+			s.removeConn(c)
+		}
+		chanDone <- struct{}{}
+	}()
+
+	select {
+	case <-ctx.Done():
+		logger.Error("timed out waiting for server to shutdown")
+	case <-chanDone:
+		logger.Info("shutdown successful")
 	}
 
 	return nil
@@ -100,7 +112,7 @@ func (s *Server) handle(c *conn) {
 			}
 		}
 
-		io.Copy(c.rwc, strings.NewReader(fmt.Sprintf("Welcome, %s!\n", c.username)))
+		io.Copy(c.rwc, strings.NewReader(fmt.Sprintf("\nWelcome, %s!\n", c.username)))
 	}
 
 	// handle the thing
@@ -109,9 +121,10 @@ func (s *Server) handle(c *conn) {
 			return
 		}
 
-		buf := bufio.NewReader(c.rwc)
+		buf := bufio.NewReaderSize(c.rwc, 2048)
 
 		line, err := buf.ReadString('\n')
+		line = strings.TrimSuffix(line, "\n")
 
 		if err != nil {
 			if errors.Is(err, io.EOF) {
@@ -150,5 +163,6 @@ func (c conn) String() string {
 
 func (c *conn) close() {
 	logger.Info("closing connection", "ip", c.ip)
+	io.Copy(c.rwc, strings.NewReader("info: server closed connection"))
 	c.rwc.Close()
 }
