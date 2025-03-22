@@ -74,6 +74,47 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+func (s *Server) Broadcast(c *conn, msg string) {
+	logger.Info("broadcasting message", "msg", msg, "from", c.username)
+	wg := &sync.WaitGroup{}
+	wg.Add(len(s.activeConn) - 1)
+
+	for cn := range s.activeConn {
+		if cn == c {
+			continue
+		}
+		go func() {
+			defer wg.Done()
+			io.Copy(cn.rwc, strings.NewReader(msg))
+		}()
+	}
+	wg.Wait()
+}
+
+func (s *Server) SendMessage(c *conn, msg string) {
+	msg = fmt.Sprintf("[%s] %s\n", c.username, msg)
+	s.Broadcast(c, msg)
+}
+
+func (s *Server) UserAction(c *conn, action string) {
+	for cn := range s.activeConn {
+		if cn == c {
+			continue
+		}
+
+		var msg string
+
+		switch action {
+		case "join":
+			msg = fmt.Sprintf("* %s has entered the room\n", c.username)
+		case "leave":
+			msg = fmt.Sprintf("* %s has left the room\n", c.username)
+		}
+
+		s.Broadcast(c, msg)
+	}
+}
+
 func (s *Server) handle(c *conn) {
 	defer func() {
 		logger.Info("closing connection", "ip", c.ip)
@@ -87,19 +128,27 @@ func (s *Server) handle(c *conn) {
 		// read in username
 		buf := bufio.NewReaderSize(c.rwc, 64)
 		username, err := buf.ReadString('\n')
+		logger.Info("read username", username)
 
 		if err != nil {
 			logger.Error("error reading username", "error", err.Error(), "ip", c.ip)
 			return
 		}
 
-		if len(username) < 1 {
+		c.username = strings.TrimSuffix(username, "\n")
+
+		if len(c.username) < 1 {
 			logger.Error("Username less than 1 character", "ip", c.ip)
-			io.Copy(c.rwc, strings.NewReader("error: username must be at least 1 character"))
+			io.Copy(c.rwc, strings.NewReader("error: username must be at least 1 character\n"))
 			return
 		}
 
-		c.username = strings.TrimSuffix(username, "\n")
+		switch c.username {
+		case "":
+			logger.Error("Username is a new line", "ip", c.ip)
+			io.Copy(c.rwc, strings.NewReader("error: username must be at least 1 character\n"))
+			return
+		}
 
 		for sC := range s.activeConn {
 			if sC == c {
@@ -112,7 +161,8 @@ func (s *Server) handle(c *conn) {
 			}
 		}
 
-		io.Copy(c.rwc, strings.NewReader(fmt.Sprintf("* The room contains: %s\n", "<TODO - users>")))
+		s.UserAction(c, "join")
+		io.Copy(c.rwc, strings.NewReader(fmt.Sprintf("* The room contains: %s\n", s.getUsers(c))))
 	}
 
 	// handle the thing
@@ -121,8 +171,6 @@ func (s *Server) handle(c *conn) {
 			return
 		}
 
-		// TODO: check if new user joined
-
 		buf := bufio.NewReaderSize(c.rwc, 2048)
 
 		line, err := buf.ReadString('\n')
@@ -130,16 +178,37 @@ func (s *Server) handle(c *conn) {
 
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				// TODO: send disconnect signal
+				s.UserAction(c, "leave")
 				return
 			}
 			logger.Error(err.Error())
 			continue
 		}
 
+		// Don't print empty lines
+		switch line {
+		case "", "\t":
+			continue
+		}
+
 		// Send this line to all clients except current client
-		logger.Info("read line", "line", line)
+		s.SendMessage(c, line)
 	}
+}
+
+func (s *Server) getUsers(c *conn) string {
+	var result []string
+
+	s.mu.Lock()
+	for cn := range s.activeConn {
+		if cn.username == c.username {
+			continue
+		}
+		result = append(result, cn.username)
+	}
+	s.mu.Unlock()
+
+	return strings.Join(result, " ")
 }
 
 func (s *Server) addConn(c *conn) {
