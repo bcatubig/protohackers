@@ -7,7 +7,7 @@ Done:
 -   [x] Smoke Test
 -   [x] Prime Time
 -   [x] Means to an End
--   [ ] Budget Chat
+-   [x] Budget Chat
 
 ## Deploying
 
@@ -41,3 +41,8 @@ go test -v ./...
 -   Experimented with [B-Tree](https://github.com/tidwall/btree) library which was a lot of fun.
 
 ### 3
+
+-   The most fun challenge yet
+-   Learned about multi-threaded chat servers
+-   Parsing
+-   Avoiding deadlocks
