@@ -79,6 +79,7 @@ func (s *Server) Broadcast(c *conn, msg string) {
 	wg := &sync.WaitGroup{}
 	wg.Add(len(s.activeConn) - 1)
 
+	s.mu.Lock()
 	for cn := range s.activeConn {
 		if cn == c {
 			continue
@@ -88,6 +89,8 @@ func (s *Server) Broadcast(c *conn, msg string) {
 			io.Copy(cn.rwc, strings.NewReader(msg))
 		}()
 	}
+	s.mu.Unlock()
+
 	wg.Wait()
 }
 
@@ -150,6 +153,7 @@ func (s *Server) handle(c *conn) {
 			return
 		}
 
+		s.mu.Lock()
 		for sC := range s.activeConn {
 			if sC == c {
 				continue
@@ -160,6 +164,7 @@ func (s *Server) handle(c *conn) {
 				return
 			}
 		}
+		s.mu.Unlock()
 
 		s.UserAction(c, "join")
 		io.Copy(c.rwc, strings.NewReader(fmt.Sprintf("* The room contains: %s\n", s.getUsers(c))))
