@@ -128,7 +128,7 @@ func (s *Server) handle(c *conn) {
 		// read in username
 		buf := bufio.NewReaderSize(c.rwc, 64)
 		username, err := buf.ReadString('\n')
-		logger.Info("read username", username)
+		logger.Info("read username", "username", c.username, "ip", c.ip)
 
 		if err != nil {
 			logger.Error("error reading username", "error", err.Error(), "ip", c.ip)
