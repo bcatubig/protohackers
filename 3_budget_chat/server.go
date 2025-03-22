@@ -211,6 +211,11 @@ func (s *Server) getUsers(c *conn) string {
 		if cn.username == c.username {
 			continue
 		}
+
+		if !c.joined {
+			continue
+		}
+
 		result = append(result, cn.username)
 	}
 	s.mu.Unlock()
