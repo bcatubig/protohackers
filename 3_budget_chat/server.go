@@ -206,6 +206,8 @@ func (s *Server) handle(c *conn) {
 func (s *Server) getUsers(c *conn) string {
 	var result []string
 
+	logger.Info("getting users", "ip", c.ip)
+
 	s.mu.Lock()
 	for cn := range s.activeConn {
 		if cn.username == c.username {
