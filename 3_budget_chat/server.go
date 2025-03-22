@@ -81,7 +81,7 @@ func (s *Server) Broadcast(c *conn, msg string) {
 
 	s.mu.Lock()
 	for cn := range s.activeConn {
-		if cn == c {
+		if cn == c || !cn.joined {
 			continue
 		}
 		go func() {
@@ -110,8 +110,10 @@ func (s *Server) UserAction(c *conn, action string) {
 		switch action {
 		case "join":
 			msg = fmt.Sprintf("* %s has entered the room\n", c.username)
+			c.joined = true
 		case "leave":
 			msg = fmt.Sprintf("* %s has left the room\n", c.username)
+			c.joined = false
 		}
 
 		s.Broadcast(c, msg)
@@ -232,6 +234,7 @@ type conn struct {
 	rwc      net.Conn
 	ip       string
 	username string
+	joined   bool
 }
 
 func (c conn) String() string {
