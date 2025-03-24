@@ -51,3 +51,10 @@ go test -v ./...
 ### 4
 
 - Oh dang UDP is way different than TCP
+
+### 5
+
+- Regex parsing
+    - Go's lack of forward/negative lookahead
+- TCP forwarding
+- Goroutines for reading/writing from the client -> server, server -> upstream
