@@ -117,7 +117,7 @@ func (s *Server) handle(c *conn) {
 			if interval > 0 {
 				go func() {
 					ticker := time.NewTicker((time.Duration(interval) / 10) * time.Second)
-					for _ = range ticker.C {
+					for range ticker.C {
 						binary.Write(c, binary.BigEndian, uint8(65))
 					}
 
