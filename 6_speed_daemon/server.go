@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -98,8 +99,6 @@ func (s *Server) handle(c *conn) {
 			continue
 		}
 
-		logger.Info(string(data))
-
-		return
+		logger.Info(fmt.Sprintf("%b", data))
 	}
 }
