@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
+	"bufio"
 	"context"
 	"encoding/binary"
-	"errors"
-	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -88,22 +86,21 @@ func (s *Server) handle(c *conn) {
 	for {
 		c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
-		buf := make([]byte, 0, 2048)
-		_, err := io.ReadFull(c, buf)
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				logger.Info("client disconnected", "ip", c.ip)
-				return
-			}
-			continue
-		}
+		// buf := make([]byte, 0, 2048)
+		// _, err := io.ReadFull(c, buf)
+		// if err != nil {
+		// 	if errors.Is(err, io.EOF) {
+		// 		logger.Info("client disconnected", "ip", c.ip)
+		// 		return
+		// 	}
+		// 	continue
+		// }
 
-		bufReader := bytes.NewReader(buf)
+		bufReader := bufio.NewReader(c)
 
 		var msgType uint8
 		binary.Read(bufReader, binary.BigEndian, &msgType)
 
-		logger.Info("got data", "type", msgType, "raw_data", string(buf))
-		return
+		logger.Info("got data", "type", msgType)
 	}
 }
