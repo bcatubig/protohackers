@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -84,19 +84,24 @@ func (s *Server) handle(c *conn) {
 		s.removeConn(c)
 	}()
 
-	reader := bufio.NewReader(c)
-
 	for {
 		c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
-		line, err := reader.ReadString('\n')
+		buf := new(bytes.Buffer)
+		_, err := io.Copy(buf, c)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				logger.Info("client disconnected", "ip", c.ip)
 				return
 			}
+
 			continue
 		}
-		logger.Info(line)
+
+		mType := buf.Next(4)
+
+		logger.Info(string(mType))
+
+		return
 	}
 }
