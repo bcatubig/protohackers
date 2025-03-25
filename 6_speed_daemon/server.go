@@ -87,8 +87,8 @@ func (s *Server) handle(c *conn) {
 	for {
 		c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
-		buf := make([]byte, 0, 2048)
-		_, err := c.Read(buf)
+		bufType := make([]byte, 0, 4)
+		_, err := io.ReadFull(c, bufType)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				logger.Info("client disconnected", "ip", c.ip)
@@ -98,8 +98,9 @@ func (s *Server) handle(c *conn) {
 		}
 
 		var msgType uint8
-		binary.Decode(buf, binary.BigEndian, &msgType)
+		binary.Decode(bufType, binary.BigEndian, &msgType)
 
 		logger.Info("got data", "type", msgType)
+		return
 	}
 }
