@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -99,6 +100,6 @@ func (s *Server) handle(c *conn) {
 			continue
 		}
 
-		logger.Info(fmt.Sprintf("%b", data))
+		logger.Info(fmt.Sprintf("%s", hex.EncodeToString(data)))
 	}
 }
