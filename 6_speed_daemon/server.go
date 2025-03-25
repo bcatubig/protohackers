@@ -3,11 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/tidwall/btree"
 )
@@ -84,47 +82,28 @@ func (s *Server) handle(c *conn) {
 	}()
 
 	for {
-		//c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		// c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
-		buf := make([]byte, 1024)
+		b := make([]byte, 1024)
 
-		_, err := c.Read(buf)
-
+		n, err := c.Read(b)
 		if err != nil {
 			logger.Error(err.Error())
 			return
 		}
 
-		bufR := bytes.NewBuffer(buf)
+		if n == 0 {
+			continue
+		}
 
-		mType := bufR.Next(1)
-
-		var msgType uint8
-		_, err = binary.Decode(mType, binary.BigEndian, &msgType)
+		buf := bytes.NewBuffer(b)
+		mType, err := parseMsgType(buf)
 		if err != nil {
-			logger.Error(err.Error())
-			return
+			logger.Error("error parsing msg type", "error", err.Error(), "ip", c.ip)
+			continue
 		}
 
-		logger.Info("got data", "type", msgType)
-
-		if msgType == 64 {
-			var interval uint32
-			rawInterval := bufR.Next(4)
-			binary.Decode(rawInterval, binary.BigEndian, &interval)
-			logger.Info("interval", "val", interval)
-
-			if interval > 0 {
-				go func() {
-					ticker := time.NewTicker((time.Duration(interval) / 10) * time.Second)
-					for range ticker.C {
-						binary.Write(c, binary.BigEndian, uint8(65))
-					}
-
-				}()
-
-			}
-		}
+		logger.Info("")
 
 	}
 }
