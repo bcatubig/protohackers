@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"net"
@@ -83,15 +84,47 @@ func (s *Server) handle(c *conn) {
 	}()
 
 	for {
-		c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		//c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+		buf := make([]byte, 1024)
+
+		_, err := c.Read(buf)
+
+		if err != nil {
+			logger.Error(err.Error())
+			return
+		}
+
+		bufR := bytes.NewBuffer(buf)
+
+		mType := bufR.Next(1)
 
 		var msgType uint8
-		err := binary.Read(c, binary.BigEndian, &msgType)
+		_, err = binary.Decode(mType, binary.BigEndian, &msgType)
 		if err != nil {
 			logger.Error(err.Error())
 			return
 		}
 
 		logger.Info("got data", "type", msgType)
+
+		if msgType == 64 {
+			var interval uint32
+			rawInterval := bufR.Next(4)
+			binary.Decode(rawInterval, binary.BigEndian, &interval)
+			logger.Info("interval", "val", interval)
+
+			if interval > 0 {
+				go func() {
+					ticker := time.NewTicker((time.Duration(interval) / 10) * time.Second)
+					for _ = range ticker.C {
+						binary.Write(c, binary.BigEndian, uint8(65))
+					}
+
+				}()
+
+			}
+		}
+
 	}
 }
