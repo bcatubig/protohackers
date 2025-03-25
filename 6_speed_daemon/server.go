@@ -100,7 +100,7 @@ func (s *Server) handle(c *conn) {
 		var msgType uint8
 		binary.Decode(bufType, binary.BigEndian, &msgType)
 
-		logger.Info("got data", "type", msgType)
+		logger.Info("got data", "type", msgType, "raw", string(bufType))
 		return
 	}
 }
