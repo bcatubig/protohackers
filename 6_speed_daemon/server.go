@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"encoding/binary"
-	"errors"
-	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -87,20 +85,13 @@ func (s *Server) handle(c *conn) {
 	for {
 		c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
-		bufType := make([]byte, 0, 4)
-		_, err := io.ReadFull(c, bufType)
+		var msgType uint8
+		err := binary.Read(c, binary.BigEndian, &msgType)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				logger.Info("client disconnected", "ip", c.ip)
-				return
-			}
-			continue
+			logger.Error(err.Error())
+			return
 		}
 
-		var msgType uint8
-		binary.Decode(bufType, binary.BigEndian, &msgType)
-
-		logger.Info("got data", "type", msgType, "raw", string(bufType))
-		return
+		logger.Info("got data", "type", msgType)
 	}
 }
