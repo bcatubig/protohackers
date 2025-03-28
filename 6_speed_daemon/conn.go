@@ -3,8 +3,10 @@ package main
 import "net"
 
 type conn struct {
-	conn net.Conn
-	ip   string
+	conn         net.Conn
+	ip           string
+	isCamera     bool
+	isDispatcher bool
 }
 
 func (c *conn) Read(b []byte) (int, error) {

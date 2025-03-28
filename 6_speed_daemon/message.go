@@ -2,13 +2,16 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 )
 
-type MsgType uint8
-type Road uint16
-type Mile uint16
-type SpeedLimitMPH uint16
+type (
+	MsgType       uint8
+	Road          uint16
+	Mile          uint16
+	SpeedLimitMPH uint16
+)
 
 const (
 	MsgTypeError         MsgType = 16
@@ -35,7 +38,6 @@ func parsePlate(r io.Reader) (*Plate, error) {
 
 	pData := make([]byte, pLength)
 	_, err := io.ReadFull(r, pData)
-
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +46,6 @@ func parsePlate(r io.Reader) (*Plate, error) {
 
 	var pTimestamp uint32
 	err = binary.Read(r, binary.BigEndian, &pTimestamp)
-
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +73,6 @@ func parseWantHeartbeat(r io.Reader) (*WantHeartbeat, error) {
 	result := &WantHeartbeat{}
 
 	err := binary.Read(r, binary.BigEndian, result)
-
 	if err != nil {
 		return nil, err
 	}
@@ -81,6 +81,7 @@ func parseWantHeartbeat(r io.Reader) (*WantHeartbeat, error) {
 }
 
 type Camera struct {
+	conn     *conn
 	Road     uint16
 	Mile     uint16
 	LimitMPH uint16
@@ -90,7 +91,6 @@ func parseCamera(r io.Reader) (*Camera, error) {
 	result := &Camera{}
 
 	err := binary.Read(r, binary.BigEndian, result)
-
 	if err != nil {
 		return nil, err
 	}
@@ -102,6 +102,10 @@ type Dispatcher struct {
 	Roads []uint16
 }
 
+func (d Dispatcher) String() string {
+	return fmt.Sprintf("dispatcher: [%v]", d.Roads)
+}
+
 func parseDispatcher(r io.Reader) (*Dispatcher, error) {
 	result := &Dispatcher{
 		Roads: make([]uint16, 0),
@@ -109,7 +113,6 @@ func parseDispatcher(r io.Reader) (*Dispatcher, error) {
 
 	var numRoads uint8
 	err := binary.Read(r, binary.BigEndian, &numRoads)
-
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +120,6 @@ func parseDispatcher(r io.Reader) (*Dispatcher, error) {
 	for range numRoads {
 		var roadNum uint16
 		err = binary.Read(r, binary.BigEndian, &roadNum)
-
 		if err != nil {
 			return nil, err
 		}

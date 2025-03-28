@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"io"
 	"net"
@@ -12,16 +11,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/tidwall/btree"
 )
 
 type Server struct {
 	l          net.Listener
 	activeConn map[*conn]struct{}
-	db         *btree.Map[string, string]
 	inShutdown atomic.Bool
 	mu         sync.Mutex
+	dispatcher *DispatcherService
 }
 
 func NewServer(addr string) (*Server, error) {
@@ -30,11 +27,13 @@ func NewServer(addr string) (*Server, error) {
 		return nil, err
 	}
 
+	dispatcher := NewDispatcherService()
+
 	return &Server{
 		l:          l,
 		activeConn: make(map[*conn]struct{}),
-		db:         new(btree.Map[string, string]),
 		mu:         sync.Mutex{},
+		dispatcher: dispatcher,
 	}, nil
 }
 
@@ -92,69 +91,70 @@ func (s *Server) handle(c *conn) {
 
 	reader := bufio.NewReaderSize(c, 1024)
 
-	for {
-		var mType MsgType
-		err := binary.Read(reader, binary.BigEndian, &mType)
-
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				logger.Info("client disconnected", "ip", c.ip)
-				return
-			}
-
-			logger.Error(err.Error())
+	// first identify the client from message
+	var mType MsgType
+	err := binary.Read(reader, binary.BigEndian, &mType)
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			logger.Info("client disconnected", "ip", c.ip)
 			return
 		}
 
+		logger.Error(err.Error())
+		return
+	}
+
+	switch mType {
+	case MsgTypeIAmCamera:
+		logger.Info("camera connected", "ip", c.ip)
+		c.isCamera = true
+		camera, err := parseCamera(reader)
+		if err != nil {
+			logger.Error("failed to parse camera", "error", err.Error())
+			return
+		}
+		logger.Info("new camera", "road", camera.Road, "mile", camera.Mile, "limit_mph", camera.LimitMPH)
+	case MsgTypeIAmDispatcher:
+		logger.Info("dispatcher connected", "ip", c.ip)
+		c.isDispatcher = true
+		d, err := parseDispatcher(reader)
+		if err != nil {
+			logger.Error("failed to parse dispatcher msg", "error", err.Error(), "ip", c.ip)
+			return
+		}
+		logger.Info("got dispatcher", "num_roads", len(d.Roads), "roads", d.Roads, "ip", c.ip)
+		s.dispatcher.RegisterDispatcher(d)
+
+	case MsgTypeWantHeartbeat:
+		msg, err := parseWantHeartbeat(reader)
+		if err != nil {
+			logger.Error("failed to parse wantHeartbeat msg", "error", err.Error())
+			return
+		}
+
+		if msg.Interval > 0 {
+			s.registerHeartbeat(c, msg.Interval)
+		}
+	}
+
+	// parse message body
+	for {
 		switch mType {
-		case MsgTypeWantHeartbeat:
-			msg, err := parseWantHeartbeat(reader)
-			if err != nil {
-				logger.Error("failed to parse wantHeartbeat msg", "error", err.Error())
+		case MsgTypePlate:
+			if !c.isCamera {
+				s.sendError(c, "not a valid camera, cannot send plate")
 				continue
 			}
-
-			if msg.Interval > 0 {
-				s.registerHeartbeat(c, msg.Interval)
-			}
-		case MsgTypePlate:
 			p, err := parsePlate(reader)
 			if err != nil {
 				logger.Error("failed to parse plate", "error", err.Error())
-				continue
 			}
 			logger.Info("read plate", "plate", p.Plate, "timestamp", p.Timestamp, "ip", c.ip)
-		case MsgTypeIAmCamera:
-			logger.Info("got IAmCamera msg")
-			camera, err := parseCamera(reader)
-			if err != nil {
-				logger.Error("failed to parse camera", "error", err.Error())
-				continue
-			}
-			s.addCamera(c, camera)
-		case MsgTypeIAmDispatcher:
-			logger.Info("got IAmDispatcher msg")
-			d, err := parseDispatcher(reader)
-
-			if err != nil {
-				logger.Error("failed to parse dispatcher msg", "error", err.Error(), "ip", c.ip)
-				continue
-			}
-
-			logger.Info("got dispatcher", "num_roads", len(d.Roads), "roads", d.Roads, "ip", c.ip)
 		default:
-			got, err := hex.DecodeString(string(mType))
-			if err != nil {
-				logger.Error(err.Error())
-				continue
-			}
-			logger.Info("got unknown message type", "type", string(got))
+			logger.Error("unknown message type", "type", mType)
+			continue
 		}
 	}
-}
-
-func (s *Server) addCamera(c *conn, camera *Camera) {
-	logger.Info("registering camera", "road", camera.Road, "mile", "camera.Mile", "limit_mph", camera.LimitMPH, "ip", c.ip)
 }
 
 func (s *Server) registerHeartbeat(c *conn, interval uint32) {
@@ -163,7 +163,6 @@ func (s *Server) registerHeartbeat(c *conn, interval uint32) {
 		ticker := time.NewTicker(time.Duration(interval) * time.Second / 10)
 		for range ticker.C {
 			err := binary.Write(c, binary.BigEndian, MsgHeartbeat)
-
 			if err != nil {
 				return
 			}
@@ -173,13 +172,11 @@ func (s *Server) registerHeartbeat(c *conn, interval uint32) {
 
 func (s *Server) sendError(c *conn, msg string) {
 	err := binary.Write(c, binary.BigEndian, MsgTypeError)
-
 	if err != nil {
 		return
 	}
 
 	_, err = io.Copy(c, strings.NewReader(msg))
-
 	if err != nil {
 		return
 	}
