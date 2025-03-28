@@ -90,17 +90,17 @@ func parseCamera(r io.Reader) (*Camera, error) {
 	result := &Camera{}
 
 	// parse road
-	err := binary.Read(r, binary.BigEndian, result.Road)
+	err := binary.Read(r, binary.BigEndian, &result.Road)
 	if err != nil {
 		return nil, err
 	}
 
-	err = binary.Read(r, binary.BigEndian, result.Mile)
+	err = binary.Read(r, binary.BigEndian, &result.Mile)
 	if err != nil {
 		return nil, err
 	}
 
-	err = binary.Read(r, binary.BigEndian, result.LimitMPH)
+	err = binary.Read(r, binary.BigEndian, &result.LimitMPH)
 	if err != nil {
 		return nil, err
 	}
