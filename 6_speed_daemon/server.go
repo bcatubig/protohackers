@@ -139,6 +139,17 @@ func (s *Server) handle(c *conn) {
 	logger.Info("processing messages")
 	// parse message body
 	for {
+		err := binary.Read(reader, binary.BigEndian, &mType)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				logger.Info("client disconnected", "ip", c.ip)
+				return
+			}
+
+			logger.Error(err.Error())
+			return
+		}
+
 		switch mType {
 		case MsgTypePlate:
 			if !c.isCamera {
