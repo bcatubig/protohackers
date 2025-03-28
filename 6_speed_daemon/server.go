@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	"bufio"
 	"context"
 	"net"
 	"sync"
@@ -84,26 +84,13 @@ func (s *Server) handle(c *conn) {
 	for {
 		// c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
-		b := make([]byte, 1024)
-
-		n, err := c.Read(b)
+		r := bufio.NewReaderSize(c, 1024)
+		got, err := r.ReadByte()
 		if err != nil {
 			logger.Error(err.Error())
-			return
-		}
-
-		if n == 0 {
 			continue
 		}
 
-		buf := bytes.NewBuffer(b)
-		mType, err := parseMsgType(buf)
-		if err != nil {
-			logger.Error("error parsing msg type", "error", err.Error(), "ip", c.ip)
-			continue
-		}
-
-		logger.Info("")
-
+		logger.Info(string(got))
 	}
 }
