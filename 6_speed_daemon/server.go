@@ -124,20 +124,9 @@ func (s *Server) handle(c *conn) {
 		}
 		logger.Info("got dispatcher", "num_roads", len(d.Roads), "roads", d.Roads)
 		s.dispatcher.RegisterDispatcher(d)
-
-	case MsgTypeWantHeartbeat:
-		msg, err := parseWantHeartbeat(reader)
-		if err != nil {
-			logger.Error("failed to parse wantHeartbeat msg", "error", err.Error())
-			return
-		}
-
-		if msg.Interval > 0 {
-			s.registerHeartbeat(c, msg.Interval)
-		}
 	}
 
-	// parse message body
+	// Continously read messages from client
 	for {
 		err := binary.Read(reader, binary.BigEndian, &mType)
 		if err != nil {
@@ -161,6 +150,17 @@ func (s *Server) handle(c *conn) {
 				logger.Error("failed to parse plate", "error", err.Error())
 			}
 			logger.Info("read plate", "plate", p.Plate, "timestamp", p.Timestamp)
+		case MsgTypeWantHeartbeat:
+			logger.Info("got heartbeat request")
+			msg, err := parseWantHeartbeat(reader)
+			if err != nil {
+				logger.Error("failed to parse wantHeartbeat msg", "error", err.Error())
+				return
+			}
+
+			if msg.Interval > 0 {
+				s.registerHeartbeat(c, msg.Interval)
+			}
 		}
 	}
 }
