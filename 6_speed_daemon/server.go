@@ -4,7 +4,11 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
+	"errors"
+	"io"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -47,6 +51,8 @@ func (s *Server) ListenAndServe() {
 			ip:   c.RemoteAddr().String(),
 		}
 
+		s.addConn(conn)
+
 		go s.handle(conn)
 	}
 }
@@ -59,6 +65,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
 	for c := range s.activeConn {
 		c.Close()
+		s.removeConn(c)
 	}
 	s.mu.Unlock()
 
@@ -83,48 +90,78 @@ func (s *Server) handle(c *conn) {
 		s.removeConn(c)
 	}()
 
-	for {
-		reader := bufio.NewReader(c)
+	reader := bufio.NewReaderSize(c, 1024)
 
+	for {
 		var mType MsgType
 		err := binary.Read(reader, binary.BigEndian, &mType)
 
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				logger.Info("client disconnected", "ip", c.ip)
+				return
+			}
+
 			logger.Error(err.Error())
 			return
 		}
 
-		logger.Info("mType", "type", string(mType))
-
-		type wantHeartbeat struct {
-			Interval uint32
-		}
-
-		if mType == MsgTypeWantHeartbeat {
-			// read next 4 bytes
-			msg := &wantHeartbeat{}
-
-			err = binary.Read(reader, binary.BigEndian, msg)
-
+		switch mType {
+		case MsgTypeWantHeartbeat:
+			msg, err := parseWantHeartbeat(reader)
 			if err != nil {
-				logger.Error(err.Error())
-				return
+				logger.Error("failed to parse wantHeartbeat msg", "error", err.Error())
+				continue
 			}
 
-			logger.Info("got wantHeartbeat msg", "data", msg)
 			if msg.Interval > 0 {
-				logger.Info("registering heartbeat", "interval", msg.Interval, "ip", c.ip)
 				s.registerHeartbeat(c, msg.Interval)
 			}
+		case MsgTypePlate:
+			p, err := parsePlate(reader)
+			if err != nil {
+				logger.Error("failed to parse plate", "error", err.Error())
+				continue
+			}
+			logger.Info("read plate", "plate", p.Plate, "timestamp", p.Timestamp, "ip", c.ip)
+		case MsgTypeIAmCamera:
+			logger.Info("got IAmCamera msg")
+			camera, err := parseCamera(reader)
+			if err != nil {
+				logger.Error("failed to parse camera", "error", err.Error())
+				continue
+			}
+			s.addCamera(c, camera)
+		case MsgTypeIAmDispatcher:
+			logger.Info("got IAmDispatcher msg")
+			d, err := parseDispatcher(reader)
+
+			if err != nil {
+				logger.Error("failed to parse dispatcher msg", "error", err.Error(), "ip", c.ip)
+				continue
+			}
+
+			logger.Info("got dispatcher", "num_roads", len(d.Roads), "roads", d.Roads, "ip", c.ip)
+		default:
+			got, err := hex.DecodeString(string(mType))
+			if err != nil {
+				logger.Error(err.Error())
+				continue
+			}
+			logger.Info("got unknown message type", "type", string(got))
 		}
 	}
 }
 
+func (s *Server) addCamera(c *conn, camera *Camera) {
+	logger.Info("registering camera", "road", camera.Road, "mile", "camera.Mile", "limit_mph", camera.LimitMPH, "ip", c.ip)
+}
+
 func (s *Server) registerHeartbeat(c *conn, interval uint32) {
+	logger.Info("registering heartbeat", "interval", interval, "ip", c.ip)
 	go func() {
 		ticker := time.NewTicker(time.Duration(interval) * time.Second / 10)
 		for range ticker.C {
-			//logger.Info("sending heartbeat", "ip", c.ip)
 			err := binary.Write(c, binary.BigEndian, MsgHeartbeat)
 
 			if err != nil {
@@ -132,4 +169,18 @@ func (s *Server) registerHeartbeat(c *conn, interval uint32) {
 			}
 		}
 	}()
+}
+
+func (s *Server) sendError(c *conn, msg string) {
+	err := binary.Write(c, binary.BigEndian, MsgTypeError)
+
+	if err != nil {
+		return
+	}
+
+	_, err = io.Copy(c, strings.NewReader(msg))
+
+	if err != nil {
+		return
+	}
 }
