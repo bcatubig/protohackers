@@ -89,7 +89,6 @@ func (s *Server) handle(c *conn) {
 		s.removeConn(c)
 	}()
 
-	logger = logger.With("ip", c.ip)
 	reader := bufio.NewReaderSize(c, 1024)
 
 	// first identify the client from message
