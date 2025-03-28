@@ -104,6 +104,26 @@ func (s *Server) handle(c *conn) {
 		return
 	}
 
+	// Check if heartbeat
+	if mType == MsgTypeWantHeartbeat {
+		logger.Info("got heartbeat request")
+		if c.hasHeartbeat {
+			logger.Error("client already has an active heartbeat check")
+			continue
+		}
+		c.hasHeartbeat = true
+		msg, err := parseWantHeartbeat(reader)
+		if err != nil {
+			logger.Error("failed to parse wantHeartbeat msg", "error", err.Error())
+			return
+		}
+
+		if msg.Interval > 0 {
+			s.registerHeartbeat(c, msg.Interval)
+		}
+
+	}
+
 	switch mType {
 	case MsgTypeIAmCamera:
 		logger.Info("camera connected", "ip", c.ip)
@@ -150,22 +170,6 @@ func (s *Server) handle(c *conn) {
 				logger.Error("failed to parse plate", "error", err.Error())
 			}
 			logger.Info("read plate", "plate", p.Plate, "timestamp", p.Timestamp)
-		case MsgTypeWantHeartbeat:
-			logger.Info("got heartbeat request")
-			if c.hasHeartbeat {
-				logger.Error("client already has an active heartbeat check")
-				continue
-			}
-			c.hasHeartbeat = true
-			msg, err := parseWantHeartbeat(reader)
-			if err != nil {
-				logger.Error("failed to parse wantHeartbeat msg", "error", err.Error())
-				return
-			}
-
-			if msg.Interval > 0 {
-				s.registerHeartbeat(c, msg.Interval)
-			}
 		}
 	}
 }
