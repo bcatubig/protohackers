@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -87,10 +88,10 @@ func (s *Server) handle(c *conn) {
 		r := bufio.NewReaderSize(c, 1024)
 		got, err := r.ReadByte()
 		if err != nil {
-			logger.Error(err.Error())
-			continue
+			logger.Error("client disconnected", "ip", c.ip)
+			return
 		}
 
-		logger.Info(string(got))
+		logger.Info(fmt.Sprintf("%v - %s", got, got))
 	}
 }
