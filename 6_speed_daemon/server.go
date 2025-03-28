@@ -64,7 +64,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
 	for c := range s.activeConn {
 		c.Close()
-		s.removeConn(c)
 	}
 	s.mu.Unlock()
 
