@@ -81,7 +81,6 @@ func parseWantHeartbeat(r io.Reader) (*WantHeartbeat, error) {
 }
 
 type Camera struct {
-	conn     *conn
 	Road     uint16
 	Mile     uint16
 	LimitMPH uint16
@@ -90,7 +89,18 @@ type Camera struct {
 func parseCamera(r io.Reader) (*Camera, error) {
 	result := &Camera{}
 
-	err := binary.Read(r, binary.BigEndian, result)
+	// parse road
+	err := binary.Read(r, binary.BigEndian, result.Road)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(r, binary.BigEndian, result.Mile)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(r, binary.BigEndian, result.LimitMPH)
 	if err != nil {
 		return nil, err
 	}
