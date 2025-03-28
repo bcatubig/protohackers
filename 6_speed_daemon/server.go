@@ -137,9 +137,9 @@ func (s *Server) handle(c *conn) {
 		}
 	}
 
+	logger.Info("processing messages")
 	// parse message body
 	for {
-		logger.Info("infinite read loop")
 		switch mType {
 		case MsgTypePlate:
 			if !c.isCamera {
