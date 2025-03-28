@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
-	"fmt"
+	"encoding/binary"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -82,16 +82,16 @@ func (s *Server) handle(c *conn) {
 		s.removeConn(c)
 	}()
 
+	r := bufio.NewReaderSize(c, 1024)
 	for {
-		// c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
-		r := bufio.NewReaderSize(c, 1024)
-		got, err := r.ReadByte()
+		var mType uint8
+		err := binary.Read(r, binary.BigEndian, &mType)
 		if err != nil {
-			logger.Error("client disconnected", "ip", c.ip)
+			logger.Error(err.Error())
 			return
 		}
 
-		logger.Info(fmt.Sprintf("%v - %s", got, got))
+		logger.Info(string(mType))
 	}
 }
