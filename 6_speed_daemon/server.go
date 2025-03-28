@@ -139,6 +139,7 @@ func (s *Server) handle(c *conn) {
 
 	// parse message body
 	for {
+		logger.Info("infinite read loop")
 		switch mType {
 		case MsgTypePlate:
 			if !c.isCamera {
@@ -150,9 +151,6 @@ func (s *Server) handle(c *conn) {
 				logger.Error("failed to parse plate", "error", err.Error())
 			}
 			logger.Info("read plate", "plate", p.Plate, "timestamp", p.Timestamp, "ip", c.ip)
-		default:
-			logger.Error("unknown message type", "type", mType)
-			continue
 		}
 	}
 }
