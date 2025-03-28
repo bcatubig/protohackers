@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -88,6 +89,7 @@ func (s *Server) handle(c *conn) {
 		s.removeConn(c)
 	}()
 
+	logger = logger.With("ip", c.ip)
 	reader := bufio.NewReaderSize(c, 1024)
 
 	// first identify the client from message
@@ -95,7 +97,7 @@ func (s *Server) handle(c *conn) {
 	err := binary.Read(reader, binary.BigEndian, &mType)
 	if err != nil {
 		if errors.Is(err, io.EOF) {
-			logger.Info("client disconnected", "ip", c.ip)
+			logger.Info("client disconnected")
 			return
 		}
 
@@ -114,14 +116,14 @@ func (s *Server) handle(c *conn) {
 		}
 		logger.Info("new camera", "road", camera.Road, "mile", camera.Mile, "limit_mph", camera.LimitMPH)
 	case MsgTypeIAmDispatcher:
-		logger.Info("dispatcher connected", "ip", c.ip)
+		logger.Info("dispatcher connected")
 		c.isDispatcher = true
 		d, err := parseDispatcher(reader)
 		if err != nil {
-			logger.Error("failed to parse dispatcher msg", "error", err.Error(), "ip", c.ip)
+			logger.Error("failed to parse dispatcher msg", "error", err.Error())
 			return
 		}
-		logger.Info("got dispatcher", "num_roads", len(d.Roads), "roads", d.Roads, "ip", c.ip)
+		logger.Info("got dispatcher", "num_roads", len(d.Roads), "roads", d.Roads)
 		s.dispatcher.RegisterDispatcher(d)
 
 	case MsgTypeWantHeartbeat:
@@ -136,13 +138,12 @@ func (s *Server) handle(c *conn) {
 		}
 	}
 
-	logger.Info("processing messages")
 	// parse message body
 	for {
 		err := binary.Read(reader, binary.BigEndian, &mType)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				logger.Info("client disconnected", "ip", c.ip)
+				logger.Info("client disconnected")
 				return
 			}
 
@@ -153,14 +154,14 @@ func (s *Server) handle(c *conn) {
 		switch mType {
 		case MsgTypePlate:
 			if !c.isCamera {
-				s.sendError(c, "not a valid camera, cannot send plate")
+				s.sendError(c, fmt.Sprintf("%s is not a valid camera: cannot send plate data", c.ip))
 				continue
 			}
 			p, err := parsePlate(reader)
 			if err != nil {
 				logger.Error("failed to parse plate", "error", err.Error())
 			}
-			logger.Info("read plate", "plate", p.Plate, "timestamp", p.Timestamp, "ip", c.ip)
+			logger.Info("read plate", "plate", p.Plate, "timestamp", p.Timestamp)
 		}
 	}
 }
