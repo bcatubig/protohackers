@@ -7,6 +7,7 @@ type conn struct {
 	ip           string
 	isCamera     bool
 	isDispatcher bool
+	hasHeartbeat bool
 }
 
 func (c *conn) Read(b []byte) (int, error) {

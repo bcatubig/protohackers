@@ -152,6 +152,11 @@ func (s *Server) handle(c *conn) {
 			logger.Info("read plate", "plate", p.Plate, "timestamp", p.Timestamp)
 		case MsgTypeWantHeartbeat:
 			logger.Info("got heartbeat request")
+			if c.hasHeartbeat {
+				logger.Error("client already has an active heartbeat check")
+				continue
+			}
+			c.hasHeartbeat = true
 			msg, err := parseWantHeartbeat(reader)
 			if err != nil {
 				logger.Error("failed to parse wantHeartbeat msg", "error", err.Error())
