@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/tidwall/btree"
 )
@@ -82,16 +83,53 @@ func (s *Server) handle(c *conn) {
 		s.removeConn(c)
 	}()
 
-	r := bufio.NewReaderSize(c, 1024)
 	for {
+		reader := bufio.NewReader(c)
 
-		var mType uint8
-		err := binary.Read(r, binary.BigEndian, &mType)
+		var mType MsgType
+		err := binary.Read(reader, binary.BigEndian, &mType)
+
 		if err != nil {
 			logger.Error(err.Error())
 			return
 		}
 
-		logger.Info(string(mType))
+		logger.Info("mType", "type", string(mType))
+
+		type wantHeartbeat struct {
+			Interval uint32
+		}
+
+		if mType == MsgTypeWantHeartbeat {
+			// read next 4 bytes
+			msg := &wantHeartbeat{}
+
+			err = binary.Read(reader, binary.BigEndian, msg)
+
+			if err != nil {
+				logger.Error(err.Error())
+				return
+			}
+
+			logger.Info("got wantHeartbeat msg", "data", msg)
+			if msg.Interval > 0 {
+				logger.Info("registering heartbeat", "interval", msg.Interval, "ip", c.ip)
+				s.registerHeartbeat(c, msg.Interval)
+			}
+		}
 	}
+}
+
+func (s *Server) registerHeartbeat(c *conn, interval uint32) {
+	go func() {
+		ticker := time.NewTicker(time.Duration(interval) * time.Second / 10)
+		for range ticker.C {
+			//logger.Info("sending heartbeat", "ip", c.ip)
+			err := binary.Write(c, binary.BigEndian, MsgHeartbeat)
+
+			if err != nil {
+				return
+			}
+		}
+	}()
 }

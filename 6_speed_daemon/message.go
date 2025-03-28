@@ -1,5 +1,19 @@
 package main
 
+type MsgType uint8
+
+const (
+	MsgTypeError         MsgType = 16
+	MsgTypePlate         MsgType = 32
+	MsgTypeTicket        MsgType = 33
+	MsgTypeWantHeartbeat MsgType = 64
+	MsgTypeHeartbeat     MsgType = 65
+	MsgTypeIAmCamera     MsgType = 128
+	MsgTypeIAmDispatcher MsgType = 129
+)
+
+var MsgHeartbeat uint8 = 65
+
 type MsgError struct {
 	Msg string
 }
@@ -22,8 +36,6 @@ type MsgTicket struct {
 type MsgWantHeartbeat struct {
 	Interval uint32
 }
-
-type MsgHeartbeat struct{}
 
 type MsgIAmCamera struct {
 	Road     uint16
