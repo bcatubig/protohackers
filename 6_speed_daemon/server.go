@@ -91,63 +91,8 @@ func (s *Server) handle(c *conn) {
 
 	reader := bufio.NewReaderSize(c, 1024)
 
-	// first identify the client from message
-	var mType MsgType
-	err := binary.Read(reader, binary.BigEndian, &mType)
-	if err != nil {
-		if errors.Is(err, io.EOF) {
-			logger.Info("client disconnected")
-			return
-		}
-
-		logger.Error(err.Error())
-		return
-	}
-
-	// Check if heartbeat
-	if mType == MsgTypeWantHeartbeat {
-		logger.Info("got heartbeat request")
-		if c.hasHeartbeat {
-			logger.Error("client already has an active heartbeat check")
-			continue
-		}
-		c.hasHeartbeat = true
-		msg, err := parseWantHeartbeat(reader)
-		if err != nil {
-			logger.Error("failed to parse wantHeartbeat msg", "error", err.Error())
-			return
-		}
-
-		if msg.Interval > 0 {
-			s.registerHeartbeat(c, msg.Interval)
-		}
-
-	}
-
-	switch mType {
-	case MsgTypeIAmCamera:
-		logger.Info("camera connected", "ip", c.ip)
-		c.isCamera = true
-		camera, err := parseCamera(reader)
-		if err != nil {
-			logger.Error("failed to parse camera", "error", err.Error())
-			return
-		}
-		logger.Info("new camera", "road", camera.Road, "mile", camera.Mile, "limit_mph", camera.LimitMPH)
-	case MsgTypeIAmDispatcher:
-		logger.Info("dispatcher connected")
-		c.isDispatcher = true
-		d, err := parseDispatcher(reader)
-		if err != nil {
-			logger.Error("failed to parse dispatcher msg", "error", err.Error())
-			return
-		}
-		logger.Info("got dispatcher", "num_roads", len(d.Roads), "roads", d.Roads)
-		s.dispatcher.RegisterDispatcher(d)
-	}
-
-	// Continously read messages from client
 	for {
+		var mType MsgType
 		err := binary.Read(reader, binary.BigEndian, &mType)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
@@ -160,6 +105,41 @@ func (s *Server) handle(c *conn) {
 		}
 
 		switch mType {
+		case MsgTypeIAmCamera:
+			logger.Info("camera connected", "ip", c.ip)
+			c.isCamera = true
+			camera, err := parseCamera(reader)
+			if err != nil {
+				logger.Error("failed to parse camera", "error", err.Error())
+				return
+			}
+			logger.Info("new camera", "road", camera.Road, "mile", camera.Mile, "limit_mph", camera.LimitMPH)
+		case MsgTypeIAmDispatcher:
+			logger.Info("dispatcher connected")
+			c.isDispatcher = true
+			d, err := parseDispatcher(reader)
+			if err != nil {
+				logger.Error("failed to parse dispatcher msg", "error", err.Error())
+				return
+			}
+			logger.Info("got dispatcher", "num_roads", len(d.Roads), "roads", d.Roads)
+			s.dispatcher.RegisterDispatcher(d)
+
+		case MsgTypeWantHeartbeat:
+			logger.Info("got heartbeat request")
+			if c.hasHeartbeat {
+				logger.Error("client already has an active heartbeat check")
+			}
+			c.hasHeartbeat = true
+			msg, err := parseWantHeartbeat(reader)
+			if err != nil {
+				logger.Error("failed to parse wantHeartbeat msg", "error", err.Error())
+				return
+			}
+
+			if msg.Interval > 0 {
+				s.registerHeartbeat(c, msg.Interval)
+			}
 		case MsgTypePlate:
 			if !c.isCamera {
 				s.sendError(c, fmt.Sprintf("%s is not a valid camera: cannot send plate data", c.ip))
