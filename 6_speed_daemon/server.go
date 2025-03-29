@@ -92,6 +92,11 @@ func (s *Server) handle(c *conn) {
 	reader := bufio.NewReaderSize(c, 1024)
 
 	for {
+		if s.inShutdown.Load() {
+			s.sendError(c, "service unavailable")
+			return
+		}
+
 		var mType MsgType
 		err := binary.Read(reader, binary.BigEndian, &mType)
 		if err != nil {
@@ -106,6 +111,11 @@ func (s *Server) handle(c *conn) {
 
 		switch mType {
 		case MsgTypeIAmCamera:
+			if c.isCamera {
+				s.sendError(c, "already registered as camera")
+				continue
+			}
+
 			logger.Info("camera connected", "ip", c.ip)
 			c.isCamera = true
 			camera, err := parseCamera(reader)
@@ -114,7 +124,13 @@ func (s *Server) handle(c *conn) {
 				return
 			}
 			logger.Info("new camera", "road", camera.Road, "mile", camera.Mile, "limit_mph", camera.LimitMPH)
+
 		case MsgTypeIAmDispatcher:
+			if c.isDispatcher {
+				s.sendError(c, "already registered as dispatcher")
+				continue
+			}
+
 			logger.Info("dispatcher connected")
 			c.isDispatcher = true
 			d, err := parseDispatcher(reader)
