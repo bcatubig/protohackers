@@ -123,6 +123,7 @@ func (s *Server) handle(c *conn) {
 				logger.Error("failed to parse camera", "error", err.Error())
 				return
 			}
+			c.camera = camera
 			logger.Info("new camera", "road", camera.Road, "mile", camera.Mile, "limit_mph", camera.LimitMPH)
 
 		case MsgTypeIAmDispatcher:
@@ -139,7 +140,7 @@ func (s *Server) handle(c *conn) {
 				return
 			}
 			logger.Info("got dispatcher", "num_roads", len(d.Roads), "roads", d.Roads)
-			s.dispatcher.RegisterDispatcher(d)
+			c.dispatcher = d
 
 		case MsgTypeWantHeartbeat:
 			logger.Info("got heartbeat request")
@@ -165,7 +166,7 @@ func (s *Server) handle(c *conn) {
 			if err != nil {
 				logger.Error("failed to parse plate", "error", err.Error())
 			}
-			logger.Info("read plate", "plate", p.Plate, "timestamp", p.Timestamp)
+			logger.Info("read plate", "plate", p.Plate, "timestamp", p.Timestamp, "road", c.camera.Road, "mile", c.camera.Mile, "limit_mph", c.camera.LimitMPH)
 		}
 	}
 }
