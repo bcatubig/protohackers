@@ -1,27 +1,15 @@
 package main
 
-import "net"
+import (
+	"context"
+	"net"
+)
 
 type conn struct {
-	conn net.Conn
-	ip   string
-
-	isCamera     bool
-	isDispatcher bool
-	hasHeartbeat bool
-
-	camera     *Camera
-	dispatcher *Dispatcher
+	server     *Server
+	cancelCtx  context.CancelFunc
+	rwc        net.Conn
+	remoteAddr string
 }
 
-func (c *conn) Read(b []byte) (int, error) {
-	return c.conn.Read(b)
-}
-
-func (c *conn) Write(b []byte) (int, error) {
-	return c.conn.Write(b)
-}
-
-func (c *conn) Close() error {
-	return c.conn.Close()
-}
+func (c *conn) serve(ctx context.Context) {}

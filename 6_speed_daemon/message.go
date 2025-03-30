@@ -6,24 +6,31 @@ import (
 	"io"
 )
 
-type (
-	MsgType       uint8
-	Road          uint16
-	Mile          uint16
-	SpeedLimitMPH uint16
-)
+type MsgType uint8
 
 const (
-	MsgTypeError         MsgType = 16
-	MsgTypePlate         MsgType = 32
-	MsgTypeTicket        MsgType = 33
-	MsgTypeWantHeartbeat MsgType = 64
-	MsgTypeHeartbeat     MsgType = 65
-	MsgTypeIAmCamera     MsgType = 128
-	MsgTypeIAmDispatcher MsgType = 129
+	MsgError         MsgType = 16
+	MsgPlate         MsgType = 32
+	MsgTicket        MsgType = 33
+	MsgWantHeartbeat MsgType = 64
+	MsgHeartbeat     MsgType = 65
+	MsgIAmCamera     MsgType = 128
+	MsgIAmDispatcher MsgType = 129
 )
 
-var MsgHeartbeat uint8 = 65
+var msgName = map[MsgType]string{
+	MsgError:         "error",
+	MsgPlate:         "plate",
+	MsgTicket:        "ticket",
+	MsgWantHeartbeat: "want_heartbeat",
+	MsgHeartbeat:     "heartbeat",
+	MsgIAmCamera:     "i_am_camera",
+	MsgIAmDispatcher: "i_am_dispatcher",
+}
+
+func (m MsgType) String() string {
+	return msgName[m]
+}
 
 type Plate struct {
 	Plate     string

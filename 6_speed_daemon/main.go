@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 )
@@ -17,6 +18,8 @@ func main() {
 
 	chanSignal := make(chan os.Signal, 1)
 	signal.Notify(chanSignal, os.Interrupt)
+
+	s := &http.Server{}
 
 	addr := fmt.Sprintf("0.0.0.0:%d", *flagPort)
 	srv, err := NewServer(addr)
