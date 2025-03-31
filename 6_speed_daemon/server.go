@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"net"
 	"sync"
@@ -10,18 +9,8 @@ import (
 
 var ErrServerClosed = errors.New("tcp: Server closed")
 
-type contextKey struct {
-	name string
-}
-
-func (s contextKey) String() string {
-	return "tcp server context value " + s.name
-}
-
-var serverContextKey = &contextKey{"tcp-server"}
-
 type Server struct {
-	addr       string
+	ln         net.Listener
 	activeConn map[*conn]struct{}
 	inShutdown atomic.Bool
 	mu         sync.Mutex
@@ -42,31 +31,26 @@ func (oc *onceCloseListener) close() {
 	oc.closeError = oc.Listener.Close()
 }
 
-func (s *Server) ListenAndServe() error {
-	addr := s.addr
-
-	if addr == "" {
-		addr = "0.0.0.0:8000"
+func NewServer(addr string) (*Server, error) {
+	s := &Server{
+		activeConn: make(map[*conn]struct{}),
 	}
 
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return s.Serve(ln)
+	s.ln = &onceCloseListener{Listener: ln}
+
+	return s, nil
 }
 
-func (s *Server) Serve(l net.Listener) error {
-	l = &onceCloseListener{Listener: l}
-	defer l.Close()
-
-	baseCtx := context.Background()
-
-	ctx := context.WithValue(baseCtx, serverContextKey, s)
+func (s *Server) Serve() error {
+	defer s.ln.Close()
 
 	for {
-		rw, err := l.Accept()
+		rw, err := s.ln.Accept()
 		if err != nil {
 			if s.shuttingDown() {
 				return ErrServerClosed
@@ -75,23 +59,23 @@ func (s *Server) Serve(l net.Listener) error {
 			continue
 		}
 		c := s.newConn(rw)
-		go c.serve(ctx)
+		s.addConn(c)
+		go c.serve()
 	}
 }
 
-func (s *Server) Shutdown(ctx context.Context) error {
+func (s *Server) Shutdown() error {
 	s.inShutdown.Store(true)
 
-	return nil
-}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-func (s *Server) newConn(rwc net.Conn) *conn {
-	c := &conn{
-		server: s,
-		rwc:    rwc,
+	for c := range s.activeConn {
+		c.rwc.Close()
+		delete(s.activeConn, c)
 	}
 
-	return c
+	return nil
 }
 
 func (s *Server) shuttingDown() bool {
@@ -104,33 +88,11 @@ func (s *Server) addConn(c *conn) {
 	s.mu.Unlock()
 }
 
-func (s *Server) removeConn(c *conn) {
-	s.mu.Lock()
-	delete(s.activeConn, c)
-	s.mu.Unlock()
-}
+func (s *Server) newConn(rwc net.Conn) *conn {
+	c := &conn{
+		server: s,
+		rwc:    rwc,
+	}
 
-// func (s *Server) registerHeartbeat(c *conn, interval uint32) {
-// 	logger.Info("registering heartbeat", "interval", interval, "ip", c.ip)
-// 	go func() {
-// 		ticker := time.NewTicker(time.Duration(interval) * time.Second / 10)
-// 		for range ticker.C {
-// 			err := binary.Write(c, binary.BigEndian, MsgHeartbeat)
-// 			if err != nil {
-// 				return
-// 			}
-// 		}
-// 	}()
-// }
-//
-// func (s *Server) sendError(c *conn, msg string) {
-// 	err := binary.Write(c, binary.BigEndian, MsgTypeError)
-// 	if err != nil {
-// 		return
-// 	}
-//
-// 	_, err = io.Copy(c, strings.NewReader(msg))
-// 	if err != nil {
-// 		return
-// 	}
-// }
+	return c
+}

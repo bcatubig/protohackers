@@ -1,11 +1,9 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 )
@@ -19,8 +17,6 @@ func main() {
 	chanSignal := make(chan os.Signal, 1)
 	signal.Notify(chanSignal, os.Interrupt)
 
-	s := &http.Server{}
-
 	addr := fmt.Sprintf("0.0.0.0:%d", *flagPort)
 	srv, err := NewServer(addr)
 	if err != nil {
@@ -30,12 +26,15 @@ func main() {
 
 	logger.Info("starting server", "addr", addr)
 	go func() {
-		srv.ListenAndServe()
+		err := srv.Serve()
+		if err != nil {
+			logger.Error(err.Error())
+		}
 	}()
 
 	<-chanSignal
 	logger.Info("shutting down server")
-	if err := srv.Shutdown(context.Background()); err != nil {
+	if err := srv.Shutdown(); err != nil {
 		logger.Error(err.Error())
 	}
 
