@@ -124,6 +124,16 @@ func (d Dispatcher) String() string {
 	return fmt.Sprintf("dispatcher: [%v]", d.Roads)
 }
 
+func (d *Dispatcher) HasRoad(road uint16) bool {
+	for _, r := range d.Roads {
+		if r == road {
+			return true
+		}
+	}
+
+	return false
+}
+
 func parseDispatcher(r io.Reader) (*Dispatcher, error) {
 	result := &Dispatcher{
 		Roads: make([]uint16, 0),

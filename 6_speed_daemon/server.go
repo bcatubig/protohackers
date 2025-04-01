@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"math"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -10,12 +11,11 @@ import (
 var ErrServerClosed = errors.New("tcp: Server closed")
 
 type Server struct {
-	ln         net.Listener
-	activeConn map[*conn]struct{}
-	inShutdown atomic.Bool
-	mu         sync.Mutex
-
-	dispatcherSvc DispatcherService
+	ln          net.Listener
+	inShutdown  atomic.Bool
+	mu          sync.Mutex
+	activeConn  map[*conn]struct{}
+	dispatchers []*Dispatcher
 }
 
 func NewServer(addr string) (*Server, error) {
@@ -82,4 +82,12 @@ func (s *Server) newConn(rwc net.Conn) *conn {
 	}
 
 	return c
+}
+
+func speed(distance int, time int) int {
+	return distance / (time / 3600)
+}
+
+func currentDay(timestamp uint32) int {
+	return int(math.Floor(float64(timestamp) / 86400))
 }
