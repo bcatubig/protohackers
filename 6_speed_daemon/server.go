@@ -14,21 +14,8 @@ type Server struct {
 	activeConn map[*conn]struct{}
 	inShutdown atomic.Bool
 	mu         sync.Mutex
-}
 
-type onceCloseListener struct {
-	net.Listener
-	once       sync.Once
-	closeError error
-}
-
-func (oc *onceCloseListener) Close() error {
-	oc.once.Do(oc.close)
-	return oc.closeError
-}
-
-func (oc *onceCloseListener) close() {
-	oc.closeError = oc.Listener.Close()
+	dispatcherSvc DispatcherService
 }
 
 func NewServer(addr string) (*Server, error) {
@@ -41,7 +28,7 @@ func NewServer(addr string) (*Server, error) {
 		return nil, err
 	}
 
-	s.ln = &onceCloseListener{Listener: ln}
+	s.ln = ln
 
 	return s, nil
 }

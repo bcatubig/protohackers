@@ -116,6 +116,7 @@ func parseCamera(r io.Reader) (*Camera, error) {
 }
 
 type Dispatcher struct {
+	conn  *conn
 	Roads []uint16
 }
 

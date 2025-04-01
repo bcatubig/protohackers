@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -15,6 +16,9 @@ type conn struct {
 
 	isCamera     bool
 	isDispatcher bool
+
+	camera     *Camera
+	dispatcher *Dispatcher
 }
 
 func (c *conn) close() {
@@ -54,7 +58,6 @@ func (c *conn) serve() {
 
 		switch msgType {
 		case MsgWantHeartbeat:
-			logger.Info("got heartbeat request")
 			hb, err := parseWantHeartbeat(c)
 			if err != nil {
 				logger.Error(err.Error())
@@ -63,7 +66,42 @@ func (c *conn) serve() {
 			if hb.Interval > 0 {
 				c.registerHeartbeat(hb.Interval)
 			}
+		case MsgIAmCamera:
+			if c.isCamera || c.isDispatcher {
+				c.sendError("already registered, cannot re-register")
+				continue
+			}
+			camera, err := parseCamera(c)
+			if err != nil {
+				logger.Error("failed to parse camera", "error", err.Error())
+				continue
+			}
+			fmt.Println(camera)
+		case MsgIAmDispatcher:
+			if c.isCamera || c.isDispatcher {
+				c.sendError("already registered, cannot re-register")
+				continue
+			}
+			dispatcher, err := parseDispatcher(c)
+			if err != nil {
+				logger.Error("failed to parse dispatcher", "error", err.Error())
+			}
+			dispatcher.conn = c
+			c.server.dispatcherSvc.RegisterDispatcher(dispatcher)
+		case MsgPlate:
+			if !c.isCamera {
+				logger.Error("plate event from non-camera")
+				continue
+			}
+
+			p, err := parsePlate(c)
+			if err != nil {
+				logger.Error("failed to parse plate", "error", err.Error())
+				continue
+			}
+
 		}
+
 	}
 }
 
