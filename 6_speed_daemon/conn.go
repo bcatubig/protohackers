@@ -52,7 +52,6 @@ func (c *conn) serve() {
 	for {
 		err := binary.Read(c, binary.BigEndian, &msgType)
 		if err != nil {
-			logger.Error(err.Error())
 			return
 		}
 
@@ -60,7 +59,6 @@ func (c *conn) serve() {
 		case MsgWantHeartbeat:
 			hb, err := parseWantHeartbeat(c)
 			if err != nil {
-				logger.Error(err.Error())
 				return
 			}
 			if hb.Interval > 0 {
@@ -87,7 +85,6 @@ func (c *conn) serve() {
 				logger.Error("failed to parse dispatcher", "error", err.Error())
 			}
 			dispatcher.conn = c
-			c.server.dispatcherSvc.RegisterDispatcher(dispatcher)
 		case MsgPlate:
 			if !c.isCamera {
 				logger.Error("plate event from non-camera")
@@ -99,6 +96,7 @@ func (c *conn) serve() {
 				logger.Error("failed to parse plate", "error", err.Error())
 				continue
 			}
+			fmt.Println(p)
 
 		}
 
