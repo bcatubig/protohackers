@@ -18,15 +18,12 @@ func main() {
 	signal.Notify(chanSignal, os.Interrupt)
 
 	addr := fmt.Sprintf("0.0.0.0:%d", *flagPort)
-	srv, err := NewServer(addr)
-	if err != nil {
-		logger.Error(err.Error())
-		os.Exit(1)
-	}
+
+	srv := &Server{Addr: addr}
 
 	logger.Info("starting server", "addr", addr)
 	go func() {
-		err := srv.Serve()
+		err := srv.ListenAndServe()
 		if err != nil {
 			logger.Error(err.Error())
 		}

@@ -1,36 +1,22 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
 	"strings"
-	"time"
 )
 
 type conn struct {
 	server *Server
 	rwc    net.Conn
 	ip     string
-
-	isCamera     bool
-	isDispatcher bool
-
-	camera     *Camera
-	dispatcher *Dispatcher
 }
 
 func (c *conn) close() {
 	c.rwc.Close()
-}
-
-func (c *conn) Write(b []byte) (int, error) {
-	return c.rwc.Write(b)
-}
-
-func (c *conn) Read(b []byte) (int, error) {
-	return c.rwc.Read(b)
 }
 
 func (c *conn) serve() {
@@ -38,91 +24,65 @@ func (c *conn) serve() {
 		c.ip = ra.String()
 	}
 
+	logger.Info("client connected", "ip", c.ip)
+
 	defer func() {
 		if err := recover(); err != nil {
-			logger.Error("conn panic", "error", err)
+			logger.Error("panic in handler", "error", err, "ip", c.ip)
 		}
 		logger.Info("client disconnected", "ip", c.ip)
 		c.close()
 	}()
 
-	// Read data from connection
-
-	var msgType MsgType
 	for {
-		err := binary.Read(c, binary.BigEndian, &msgType)
+		b := make([]byte, 1024)
+		n, err := c.rwc.Read(b)
 		if err != nil {
 			return
 		}
 
-		switch msgType {
-		case MsgWantHeartbeat:
-			hb, err := parseWantHeartbeat(c)
-			if err != nil {
-				return
-			}
-			if hb.Interval > 0 {
-				c.registerHeartbeat(hb.Interval)
-			}
-		case MsgIAmCamera:
-			if c.isCamera || c.isDispatcher {
-				c.sendError("already registered, cannot re-register")
-				continue
-			}
-			camera, err := parseCamera(c)
-			if err != nil {
-				logger.Error("failed to parse camera", "error", err.Error())
-				continue
-			}
-			fmt.Println(camera)
-		case MsgIAmDispatcher:
-			if c.isCamera || c.isDispatcher {
-				c.sendError("already registered, cannot re-register")
-				continue
-			}
-			dispatcher, err := parseDispatcher(c)
-			if err != nil {
-				logger.Error("failed to parse dispatcher", "error", err.Error())
-			}
-			dispatcher.conn = c
-		case MsgPlate:
-			if !c.isCamera {
-				logger.Error("plate event from non-camera")
-				continue
-			}
+		// Process msg
+		buf := bytes.NewBuffer(b[:n])
 
-			p, err := parsePlate(c)
-			if err != nil {
-				logger.Error("failed to parse plate", "error", err.Error())
-				continue
-			}
-			fmt.Println(p)
-
+		var mType MsgType
+		err = binary.Read(buf, binary.BigEndian, &mType)
+		if err != nil {
+			logger.Error("error reading msg type", "error", err)
+			continue
 		}
 
+		switch mType {
+		case MsgWantHeartbeat:
+			logger.Info("got heartbeat request")
+		default:
+			c.sendError(fmt.Sprintf("invalid msg: %v", mType))
+			continue
+		}
+
+		logger.Info("got data", "n", n, "msg_type", mType)
+		fmt.Println("after", buf.String())
 	}
 }
 
-func (c *conn) registerHeartbeat(interval uint32) {
-	logger.Info("registering heartbeat", "interval", interval, "ip", c.ip)
-	go func() {
-		ticker := time.NewTicker(time.Duration(interval) * time.Second / 10)
-		for range ticker.C {
-			err := binary.Write(c, binary.BigEndian, MsgHeartbeat)
-			if err != nil {
-				return
-			}
-		}
-	}()
-}
-
+//	func (c *conn) registerHeartbeat(interval uint32) {
+//		logger.Info("registering heartbeat", "interval", interval, "ip", c.ip)
+//		go func() {
+//			ticker := time.NewTicker(time.Duration(interval) * time.Second / 10)
+//			for range ticker.C {
+//				err := binary.Write(c, binary.BigEndian, MsgHeartbeat)
+//				if err != nil {
+//					return
+//				}
+//			}
+//		}()
+//	}
 func (c *conn) sendError(msg string) {
-	err := binary.Write(c, binary.BigEndian, MsgError)
+	err := binary.Write(c.rwc, binary.BigEndian, MsgError)
 	if err != nil {
 		return
 	}
 
-	_, err = io.Copy(c, strings.NewReader(msg))
+	_, err = io.Copy(c.rwc, strings.NewReader(msg+"\n"))
 	if err != nil {
 		return
 	}

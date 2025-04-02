@@ -6,47 +6,53 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 var ErrServerClosed = errors.New("tcp: Server closed")
 
 type Server struct {
-	ln          net.Listener
-	inShutdown  atomic.Bool
-	mu          sync.Mutex
-	activeConn  map[*conn]struct{}
-	dispatchers []*Dispatcher
+	Addr       string
+	inShutdown atomic.Bool
+	mu         sync.Mutex
+	activeConn map[*conn]struct{}
 }
 
-func NewServer(addr string) (*Server, error) {
-	s := &Server{
-		activeConn: make(map[*conn]struct{}),
+func (s *Server) ListenAndServe() error {
+	if s.shuttingDown() {
+		return ErrServerClosed
 	}
 
-	ln, err := net.Listen("tcp", addr)
+	ln, err := net.Listen("tcp", s.Addr)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	defer ln.Close()
 
-	s.ln = ln
-
-	return s, nil
+	return s.Serve(ln)
 }
 
-func (s *Server) Serve() error {
-	defer s.ln.Close()
+func (s *Server) Serve(l net.Listener) error {
+	defer l.Close()
 
 	for {
-		rw, err := s.ln.Accept()
+		rw, err := l.Accept()
 		if err != nil {
+			var ne net.Error
 			if s.shuttingDown() {
 				return ErrServerClosed
 			}
-			logger.Error(err.Error())
-			continue
+
+			if errors.As(err, &ne) {
+				logger.Error("accept error", "error", err.Error())
+				time.Sleep(5 * time.Millisecond)
+				continue
+			}
+
+			return err
 		}
+
 		c := s.newConn(rw)
-		s.addConn(c)
 		go c.serve()
 	}
 }
