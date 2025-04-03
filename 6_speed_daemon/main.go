@@ -19,7 +19,12 @@ func main() {
 
 	addr := fmt.Sprintf("0.0.0.0:%d", *flagPort)
 
-	srv := &Server{Addr: addr}
+	svc := NewDispatcherService()
+
+	srv := &Server{
+		Addr:              addr,
+		dispatcherService: svc,
+	}
 
 	logger.Info("starting server", "addr", addr)
 	go func() {

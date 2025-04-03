@@ -16,6 +16,8 @@ type Server struct {
 	inShutdown atomic.Bool
 	mu         sync.Mutex
 	activeConn map[*conn]struct{}
+
+	dispatcherService *DispatcherService
 }
 
 func (s *Server) ListenAndServe() error {
@@ -90,8 +92,8 @@ func (s *Server) newConn(rwc net.Conn) *conn {
 	return c
 }
 
-func speed(distance int, time int) int {
-	return distance / (time / 3600)
+func speed(distance int, time int) float64 {
+	return float64(distance / (time / 3600))
 }
 
 func currentDay(timestamp uint32) int {
