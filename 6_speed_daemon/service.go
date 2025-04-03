@@ -133,9 +133,9 @@ func (s *DispatcherService) handleEvent(e *CameraEvent) {
 		fmt.Println("Time:", time)
 		fmt.Println("Distance:", distance)
 
-		speed := speed(int(distance), int(time))
+		spd := speed(int(distance), int(time))
 
-		if speed-float64(e1.LimitMPH) > 0.5 {
+		if spd-float64(e1.LimitMPH) > 0.5 {
 			// Get the day
 			day := currentDay(e2.Timestamp)
 
