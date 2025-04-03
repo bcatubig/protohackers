@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"sync"
@@ -123,8 +124,14 @@ func (s *DispatcherService) handleEvent(e *CameraEvent) {
 		e1 := events[i]
 		e2 := events[i+1]
 
+		fmt.Printf("%v\n", e1)
+		fmt.Printf("%v\n", e2)
+
 		time := math.Floor(float64(e1.Timestamp) - float64(e2.Timestamp))
 		distance := math.Floor(float64(e1.Mile) - float64(e2.Mile))
+
+		fmt.Println("Time:", time)
+		fmt.Println("Distance:", distance)
 
 		speed := speed(int(distance), int(time))
 
