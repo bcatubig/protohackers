@@ -67,7 +67,9 @@ func (c *conn) serve() {
 				logger.Error("failed to parse WantHeartbeat request", "error", err.Error(), "ip", c.ip)
 				continue
 			}
-			c.registerHeartbeat(hb.Interval)
+			if hb.Interval > 0 {
+				c.registerHeartbeat(hb.Interval)
+			}
 		case MsgIAmDispatcher:
 			d, err := parseDispatcher(buf)
 			if err != nil {
