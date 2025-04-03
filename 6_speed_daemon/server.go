@@ -97,5 +97,5 @@ func speed(distance int, time int) float64 {
 }
 
 func currentDay(timestamp uint32) int {
-	return int(math.Floor(float64(timestamp) / 86400))
+	return int(math.Abs(float64(timestamp) / 86400))
 }
