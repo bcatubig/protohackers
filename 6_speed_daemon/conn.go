@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/binary"
 	"io"
 	"net"
@@ -40,21 +39,9 @@ func (c *conn) serve() {
 	}()
 
 	for {
-		b := make([]byte, 1024)
-		n, err := c.rwc.Read(b)
-		if err != nil {
-			return
-		}
-
-		if n < 1 {
-			continue
-		}
-
-		// Process msg
-		buf := bytes.NewBuffer(b[:n])
 
 		var mType MsgType
-		err = binary.Read(buf, binary.BigEndian, &mType)
+		err := binary.Read(c.rwc, binary.BigEndian, &mType)
 		if err != nil {
 			logger.Error("error reading msg type", "error", err)
 			continue
@@ -62,7 +49,7 @@ func (c *conn) serve() {
 
 		switch mType {
 		case MsgWantHeartbeat:
-			hb, err := parseWantHeartbeat(buf)
+			hb, err := parseWantHeartbeat(c.rwc)
 			if err != nil {
 				logger.Error("failed to parse WantHeartbeat request", "error", err.Error(), "ip", c.ip)
 				continue
@@ -71,7 +58,7 @@ func (c *conn) serve() {
 				c.registerHeartbeat(hb.Interval)
 			}
 		case MsgIAmDispatcher:
-			d, err := parseDispatcher(buf)
+			d, err := parseDispatcher(c.rwc)
 			if err != nil {
 				logger.Error("failed to parse IAmDispatcher request", "error", err, "ip", c.ip)
 				continue
@@ -79,7 +66,7 @@ func (c *conn) serve() {
 			c.isDispatcher = true
 			c.server.dispatcherService.RegisterDispatcher(c, d.Roads)
 		case MsgIAmCamera:
-			cam, err := parseCamera(buf)
+			cam, err := parseCamera(c.rwc)
 			if err != nil {
 				logger.Error("failed to parse camera", "error", err.Error(), "ip", c.ip)
 				continue
@@ -92,7 +79,7 @@ func (c *conn) serve() {
 				logger.Info("camera event from non-camera", "ip", c.ip)
 				continue
 			}
-			p, err := parsePlate(buf)
+			p, err := parsePlate(c.rwc)
 			if err != nil {
 				logger.Error("failed to parse plate", "error", err.Error(), "ip", c.ip)
 				continue
