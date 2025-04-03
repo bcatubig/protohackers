@@ -15,7 +15,6 @@ type conn struct {
 
 	camera *Camera
 
-	isCamera     bool
 	isDispatcher bool
 }
 
@@ -44,7 +43,7 @@ func (c *conn) serve() {
 		err := binary.Read(c.rwc, binary.BigEndian, &mType)
 		if err != nil {
 			logger.Error("error reading msg type", "error", err)
-			continue
+			return
 		}
 
 		switch mType {
@@ -71,19 +70,20 @@ func (c *conn) serve() {
 				logger.Error("failed to parse camera", "error", err.Error(), "ip", c.ip)
 				continue
 			}
-			c.isCamera = true
 			c.camera = cam
 			c.server.dispatcherService.RegisterCamera(c, cam)
 		case MsgPlate:
-			if c.camera == nil {
+			if c.camera == nil || c.isDispatcher {
 				logger.Info("camera event from non-camera", "ip", c.ip)
 				continue
 			}
+
 			p, err := parsePlate(c.rwc)
 			if err != nil {
 				logger.Error("failed to parse plate", "error", err.Error(), "ip", c.ip)
 				continue
 			}
+			logger.Info("plate event", "timestamp", p.Timestamp, "plate", p.Plate, "ip", c.ip)
 			c.server.dispatcherService.NewEvent(&CameraEvent{
 				Timestamp: p.Timestamp,
 				Plate:     p.Plate,
