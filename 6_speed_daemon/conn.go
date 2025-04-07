@@ -51,7 +51,7 @@ func (c *conn) serve() {
 		}
 
 		var mType MsgType
-		_, err := binary.Decode(b, binary.BigEndian, &mType)
+		_, err = binary.Decode(b, binary.BigEndian, &mType)
 		if err != nil {
 			continue
 		}
