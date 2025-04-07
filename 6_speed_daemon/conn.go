@@ -51,7 +51,7 @@ func (c *conn) serve() {
 		}
 
 		buf := bytes.NewBuffer(b[:n])
-		fmt.Printf("buf: %+v\n", buf)
+		fmt.Printf("buf: %v\n", buf)
 	}
 }
 
