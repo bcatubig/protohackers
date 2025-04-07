@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -37,64 +39,19 @@ func (c *conn) serve() {
 		c.close()
 	}()
 
+	b := make([]byte, 256)
 	for {
-
-		var mType MsgType
-		err := binary.Read(c.rwc, binary.BigEndian, &mType)
+		n, err := c.rwc.Read(b)
 		if err != nil {
-			logger.Error("error reading msg type", "error", err)
 			return
 		}
 
-		switch mType {
-		case MsgWantHeartbeat:
-			hb, err := parseWantHeartbeat(c.rwc)
-			if err != nil {
-				logger.Error("failed to parse WantHeartbeat request", "error", err.Error(), "ip", c.ip)
-				continue
-			}
-			if hb.Interval > 0 {
-				c.registerHeartbeat(hb.Interval)
-			}
-		case MsgIAmDispatcher:
-			d, err := parseDispatcher(c.rwc)
-			if err != nil {
-				logger.Error("failed to parse IAmDispatcher request", "error", err, "ip", c.ip)
-				continue
-			}
-			c.isDispatcher = true
-			c.server.dispatcherService.RegisterDispatcher(c, d.Roads)
-		case MsgIAmCamera:
-			cam, err := parseCamera(c.rwc)
-			if err != nil {
-				logger.Error("failed to parse camera", "error", err.Error(), "ip", c.ip)
-				continue
-			}
-			c.camera = cam
-			c.server.dispatcherService.RegisterCamera(c, cam)
-		case MsgPlate:
-			if c.camera == nil || c.isDispatcher {
-				logger.Info("camera event from non-camera", "ip", c.ip)
-				continue
-			}
-
-			p, err := parsePlate(c.rwc)
-			if err != nil {
-				logger.Error("failed to parse plate", "error", err.Error(), "ip", c.ip)
-				continue
-			}
-			logger.Info("plate event", "timestamp", p.Timestamp, "plate", p.Plate, "ip", c.ip)
-			c.server.dispatcherService.NewEvent(&CameraEvent{
-				Timestamp: p.Timestamp,
-				Plate:     p.Plate,
-				Mile:      c.camera.Mile,
-				Road:      c.camera.Road,
-				LimitMPH:  c.camera.LimitMPH,
-			})
-		default:
-			c.sendError("invalid msg")
+		if n < 1 {
 			continue
 		}
+
+		buf := bytes.NewBuffer(b[:n])
+		fmt.Printf("buf: %+v\n", buf)
 	}
 }
 
