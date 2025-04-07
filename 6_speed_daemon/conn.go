@@ -46,10 +46,22 @@ func (c *conn) serve() {
 		}
 
 		if n < 1 {
+			b = b[:0]
+			continue
+		}
+
+		var mType MsgType
+		_, err := binary.Decode(b, binary.BigEndian, &mType)
+		if err != nil {
 			continue
 		}
 
 		fmt.Printf("buf: %v\n", b[:n])
+		fmt.Println("msg type:", mType)
+		fmt.Printf("buf: %v\n", b[:n])
+
+		// zero out buf
+		b = b[:0]
 	}
 }
 
