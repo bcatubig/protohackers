@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -50,8 +49,7 @@ func (c *conn) serve() {
 			continue
 		}
 
-		buf := bytes.NewBuffer(b[:n])
-		fmt.Printf("buf: %v\n", buf)
+		fmt.Printf("buf: %v\n", b[:n])
 	}
 }
 
