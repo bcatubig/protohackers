@@ -1,0 +1,123 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"net"
+	"sync"
+	"sync/atomic"
+)
+
+type Server struct {
+	Addr       string
+	Handler    Handler
+	BaseCtx    context.Context
+	ln         net.Listener
+	inShutdown atomic.Bool
+	mu         sync.Mutex
+	activeConn map[*Conn]struct{}
+}
+
+func (s *Server) ListenAndServe() error {
+	addr := s.Addr
+
+	if addr == "" {
+		s.Addr = "0.0.0.0:8000"
+	}
+
+	s.activeConn = make(map[*Conn]struct{})
+
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		if s.isShutdown() {
+			return ErrServerClosed
+		}
+		return err
+	}
+
+	onceLn := &onceCloseListener{Listener: ln}
+	defer onceLn.Close()
+
+	return s.Serve(onceLn)
+}
+
+func (s *Server) Serve(ln net.Listener) error {
+	for {
+		c, err := ln.Accept()
+		if err != nil {
+			if s.isShutdown() {
+				return ErrServerClosed
+			}
+
+			var oe *net.OpError
+			if errors.As(err, &oe) {
+				if oe.Temporary() {
+					continue
+				}
+			}
+
+			return err
+		}
+		defer ln.Close()
+
+		var ctx context.Context
+		if s.BaseCtx != nil {
+			ctx = s.BaseCtx
+		} else {
+			ctx = context.Background()
+		}
+
+		conn := s.newConn(c)
+		s.addConn(conn)
+		go conn.serve(ctx)
+	}
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.inShutdown.Store(true)
+	s.ln.Close()
+
+	for c := range s.activeConn {
+		c.close()
+		s.removeConn(c)
+	}
+
+	return nil
+}
+
+func (s *Server) isShutdown() bool {
+	return s.inShutdown.Load()
+}
+
+func (s *Server) newConn(rwc net.Conn) *Conn {
+	return &Conn{rwc: rwc, server: s}
+}
+
+func (s *Server) addConn(c *Conn) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.activeConn[c] = struct{}{}
+}
+
+func (s *Server) removeConn(c *Conn) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.activeConn, c)
+}
+
+type onceCloseListener struct {
+	net.Listener
+	once sync.Once
+	err  error
+}
+
+func (c *onceCloseListener) Close() error {
+	c.once.Do(c.close)
+	return c.err
+}
+
+func (c *onceCloseListener) close() {
+	c.err = c.Listener.Close()
+}
