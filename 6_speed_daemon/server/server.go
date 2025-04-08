@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -16,6 +17,11 @@ type Server struct {
 	inShutdown atomic.Bool
 	mu         sync.Mutex
 	activeConn map[*Conn]struct{}
+	logger     *slog.Logger
+}
+
+func (s *Server) WithLogger(l *slog.Logger) {
+	s.logger = l
 }
 
 func (s *Server) ListenAndServe() error {
@@ -42,6 +48,7 @@ func (s *Server) ListenAndServe() error {
 }
 
 func (s *Server) Serve(ln net.Listener) error {
+	defer ln.Close()
 	for {
 		c, err := ln.Accept()
 		if err != nil {
@@ -58,7 +65,6 @@ func (s *Server) Serve(ln net.Listener) error {
 
 			return err
 		}
-		defer ln.Close()
 
 		var ctx context.Context
 		if s.BaseCtx != nil {
