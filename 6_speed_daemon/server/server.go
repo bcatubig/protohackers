@@ -8,6 +8,7 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type Server struct {
@@ -66,6 +67,7 @@ func (s *Server) Serve(ln net.Listener) error {
 			var oe *net.OpError
 			if errors.As(err, &oe) {
 				if oe.Temporary() {
+					time.Sleep(5 * time.Millisecond)
 					continue
 				}
 			}

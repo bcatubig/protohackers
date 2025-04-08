@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -16,18 +15,14 @@ func main() {
 	chanSignal := make(chan os.Signal, 1)
 	signal.Notify(chanSignal)
 
-	srv := &server.Server{
-		Handler: server.HandlerFunc(func(c *server.Conn) {
-			b := make([]byte, 256)
-			for {
-				n, err := c.Read(b)
-				if err != nil {
-					return
-				}
-				fmt.Println(string(b[:n]))
+	mux := NewMux()
+	mux.Register(64, server.HandlerFunc(func(c *server.Conn) {
+		logger.Info("in handler 64")
+		return
+	}))
 
-			}
-		}),
+	srv := &server.Server{
+		Handler: mux,
 	}
 	srv.WithLogger(logger)
 	go func() {
