@@ -1,15 +1,11 @@
 package server
 
-import (
-	"net"
-)
-
 type Handler interface {
-	Serve(net.Conn)
+	Serve(*Conn)
 }
 
-type HandlerFunc func(net.Conn)
+type HandlerFunc func(*Conn)
 
-func (f HandlerFunc) Serve(c net.Conn) {
+func (f HandlerFunc) Serve(c *Conn) {
 	f(c)
 }

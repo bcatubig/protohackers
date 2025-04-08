@@ -1,9 +1,7 @@
 package server
 
 import (
-	"context"
 	"net"
-	"time"
 )
 
 type Conn struct {
@@ -12,11 +10,23 @@ type Conn struct {
 	remoteAddr string
 }
 
+func (c *Conn) Read(b []byte) (int, error) {
+	return c.rwc.Read(b)
+}
+
+func (c *Conn) Write(b []byte) (int, error) {
+	return c.rwc.Write(b)
+}
+
+func (c *Conn) Close() error {
+	return c.rwc.Close()
+}
+
 func (c *Conn) close() {
 	c.rwc.Close()
 }
 
-func (c *Conn) serve(ctx context.Context) {
+func (c *Conn) serve() {
 	defer func() {
 		c.close()
 		c.server.removeConn(c)
@@ -29,11 +39,5 @@ func (c *Conn) serve(ctx context.Context) {
 
 	c.server.logger.Info("client connected", "ip", c.remoteAddr)
 
-	select {
-	case <-ctx.Done():
-		return
-	case <-time.Tick(5 * time.Millisecond):
-	}
-
-	c.server.Handler.Serve(c.rwc)
+	c.server.Handler.Serve(c)
 }

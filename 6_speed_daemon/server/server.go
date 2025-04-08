@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"sync"
@@ -10,9 +11,10 @@ import (
 )
 
 type Server struct {
-	Addr       string
-	Handler    Handler
-	BaseCtx    context.Context
+	Addr    string
+	Handler Handler
+	BaseCtx context.Context
+
 	ln         net.Listener
 	inShutdown atomic.Bool
 	mu         sync.Mutex
@@ -25,13 +27,17 @@ func (s *Server) WithLogger(l *slog.Logger) {
 }
 
 func (s *Server) ListenAndServe() error {
-	addr := s.Addr
-
-	if addr == "" {
-		s.Addr = "0.0.0.0:8000"
+	if s.logger == nil {
+		s.logger = slog.New(slog.DiscardHandler)
 	}
 
 	s.activeConn = make(map[*Conn]struct{})
+
+	addr := s.Addr
+
+	if addr == "" {
+		addr = "0.0.0.0:8000"
+	}
 
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -40,15 +46,16 @@ func (s *Server) ListenAndServe() error {
 		}
 		return err
 	}
+	s.logger.Info(fmt.Sprintf("Listening on: %s", addr))
 
-	onceLn := &onceCloseListener{Listener: ln}
-	defer onceLn.Close()
+	ocl := &onceCloseListener{Listener: ln}
+	s.ln = ocl
+	defer ocl.Close()
 
-	return s.Serve(onceLn)
+	return s.Serve(ocl)
 }
 
 func (s *Server) Serve(ln net.Listener) error {
-	defer ln.Close()
 	for {
 		c, err := ln.Accept()
 		if err != nil {
@@ -66,21 +73,16 @@ func (s *Server) Serve(ln net.Listener) error {
 			return err
 		}
 
-		var ctx context.Context
-		if s.BaseCtx != nil {
-			ctx = s.BaseCtx
-		} else {
-			ctx = context.Background()
-		}
-
 		conn := s.newConn(c)
 		s.addConn(conn)
-		go conn.serve(ctx)
+		go conn.serve()
 	}
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
+	s.logger.Info("server shutting down")
 	s.inShutdown.Store(true)
+
 	s.ln.Close()
 
 	for c := range s.activeConn {

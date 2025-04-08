@@ -1,11 +1,11 @@
 package main
 
 import (
-	"flag"
+	"context"
 	"fmt"
 	"log/slog"
-	"net"
 	"os"
+	"os/signal"
 
 	"github.com/bcatubig/protohackers/6_speed_daemon/server"
 )
@@ -13,13 +13,11 @@ import (
 var logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 func main() {
-	flagPort := flag.Int("p", 8000, "port to listen on")
-	flag.Parse()
+	chanSignal := make(chan os.Signal, 1)
+	signal.Notify(chanSignal)
 
-	addr := fmt.Sprintf("0.0.0.0:%d", *flagPort)
 	srv := &server.Server{
-		Addr: addr,
-		Handler: server.HandlerFunc(func(c net.Conn) {
+		Handler: server.HandlerFunc(func(c *server.Conn) {
 			b := make([]byte, 256)
 			for {
 				n, err := c.Read(b)
@@ -32,5 +30,14 @@ func main() {
 		}),
 	}
 	srv.WithLogger(logger)
-	srv.ListenAndServe()
+	go func() {
+		err := srv.ListenAndServe()
+		if err != nil {
+			logger.Error(err.Error())
+		}
+	}()
+
+	<-chanSignal
+
+	srv.Shutdown(context.Background())
 }
