@@ -1,4 +1,4 @@
-package server
+package tcp
 
 type Handler interface {
 	Serve(*Conn)

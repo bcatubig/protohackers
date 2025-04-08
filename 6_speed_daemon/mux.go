@@ -1,56 +1,55 @@
 package main
 
 import (
+	"bufio"
 	"encoding/binary"
+	"errors"
+	"io"
 	"sync"
 
-	"github.com/bcatubig/protohackers/6_speed_daemon/server"
-	"github.com/tidwall/btree"
+	"github.com/bcatubig/protohackers/pkg/tcp"
 )
 
 type Mux struct {
-	mu   sync.Mutex
-	tree btree.Map[uint8, server.Handler]
-}
-
-func (m *Mux) Register(op uint8, h server.Handler) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.tree.Set(op, h)
-}
-
-func (m *Mux) Serve(c *server.Conn) {
-	// find the handler for the incoming connection
-	b := make([]byte, 256)
-	for {
-		n, err := c.Read(b)
-		if err != nil {
-			return
-		}
-
-		if n < 1 {
-			continue
-		}
-
-		var mType uint8
-		_, err = binary.Decode(b[:1], binary.BigEndian, &mType)
-		if err != nil {
-			logger.Error(err.Error())
-			continue
-		}
-
-		// find handler
-		h, ok := m.tree.Get(mType)
-
-		if !ok {
-			continue
-		}
-
-		h.Serve(c)
-	}
+	mu sync.Mutex
 }
 
 func NewMux() *Mux {
 	return &Mux{}
+}
+
+func (m *Mux) Serve(c *tcp.Conn) {
+	// find the handler for the incoming connection
+	br := bufio.NewReader(c)
+
+	for {
+		var mType MsgType
+		err := binary.Read(br, binary.BigEndian, &mType)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return
+			}
+
+			logger.Error(err.Error())
+			continue
+		}
+
+		switch mType {
+		case WantHeartbeatMsg:
+			handleWantHeartbeat(br)
+		}
+	}
+}
+
+func handleWantHeartbeat(r io.Reader) {
+	var interval uint32
+	err := binary.Read(r, binary.BigEndian, &interval)
+	if err != nil {
+		logger.Info("nope")
+		return
+	}
+
+	if interval > 0 {
+		logger.Info("got heartbeat interval", "interval", interval)
+	}
 }
