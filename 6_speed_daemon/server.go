@@ -28,6 +28,7 @@ func (s *Server) Serve(ln net.Listener) error {
 			time.Sleep(5 * time.Millisecond)
 			continue
 		}
+
 		go s.handle(c)
 	}
 }
@@ -39,16 +40,29 @@ func (s *Server) handle(c net.Conn) {
 		c.Close()
 	}()
 
+	var b [1]byte
 	for {
-		var mType MsgType
-		err := binary.Read(c, binary.BigEndian, &mType)
-		if err != nil {
+		n, err := c.Read(b[:])
+		if n < 1 || err != nil {
 			return
+		}
+
+		var mType MsgType
+		n, err = binary.Decode(b[:], binary.BigEndian, &mType)
+		if n < 1 || err != nil {
+			continue
 		}
 
 		switch mType {
 		case WantHeartbeatMsg:
 			logger.Info("got wantHeartbeat msg")
+		case IAmCameraMsg:
+			logger.Info("got IAmCamera msg")
+		case IAmDispatcherMsg:
+			logger.Info("Got IAmDispatcher msg")
+		case PlateMsg:
+			logger.Info("Got PlateMsg")
+
 		}
 	}
 }
