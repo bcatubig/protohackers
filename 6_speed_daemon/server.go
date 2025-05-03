@@ -17,6 +17,8 @@ func (s *Server) ListenAndServe() error {
 	}
 	defer ln.Close()
 
+	s.ln = ln
+
 	return s.Serve(ln)
 }
 
